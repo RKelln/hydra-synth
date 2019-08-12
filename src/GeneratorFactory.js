@@ -1,5 +1,5 @@
 /* globals tex */
-const { seq, sin, ramp, createFades } = require('./timingUtils.js')
+const { seq, sin, ramp, vel, pos, sweep, bounce, repeat, createFades } = require('./timingUtils.js')
 const glslTransforms = require('./composable-glsl-functions.js')
 
 // in progress: implementing multiple renderpasses within a single
@@ -96,6 +96,11 @@ var GeneratorFactory = function (defaultOutput) {
   // set global utility functions. to do: make global optional
   window.sin = sin
   window.ramp = ramp
+  window.vel = vel
+  window.pos = pos
+  window.repeat = repeat
+  window.sweep = sweep
+  window.bounce = bounce
   window.frag = shaderManager(defaultOutput)
 
   createFades(6)

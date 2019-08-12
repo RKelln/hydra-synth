@@ -402,6 +402,108 @@ float _noise(vec3 v){
     }
     `
   },
+  channel: {
+    type: 'color',
+    inputs: [
+      {
+        name: 'r',
+        type: 'float',
+        default: 1.0
+      },
+      {
+        name: 'g',
+        type: 'float',
+        default: 0.0
+      },
+      {
+        name: 'b',
+        type: 'float',
+        default: 0.0
+      },
+      {
+        name: 'a',
+        type: 'float',
+        default: 1.0
+      }
+    ],
+    notes: 'Multiples each channel by the paramter passed in, good for isolating channels.',
+    glsl: `vec4 channel(vec4 c, float r, float g, float b, float a){
+      vec4 c2 = vec4(c);
+      c2.r = fract(c2.r * r);
+      c2.g = fract(c2.g * g);
+      c2.b = fract(c2.b * b);
+      c2.a = fract(c2.a * a);
+      return vec4(c2.rgba);
+    }
+    `
+  },
+  alpha: {
+    type: 'color',
+    inputs: [
+      {
+        name: 'a',
+        type: 'float',
+        default: 0
+      }
+    ],
+    glsl: `vec4 alpha(vec4 c, float a){
+      return vec4(c.rgb, a);
+    }`
+  },
+  removeColor: {
+    type: 'color',
+    inputs: [
+      {
+        name: 'r',
+        type: 'float',
+        default: 0.0
+      },
+      {
+        name: 'g',
+        type: 'float',
+        default: 0.0
+      },
+      {
+        name: 'b',
+        type: 'float',
+        default: 0.0
+      }
+    ],
+    glsl: `vec4 removeColor(vec4 c, float r, float g, float b) {
+      float a = normalize(distance(c.rgb, vec3(r,g,b)));
+      //vec4 c2 = vec4(c);
+      //c2.a = a;
+      //return vec4(c2.rgba);
+      return vec4(c.rgb, a);
+    }`
+  },
+  gray: {
+    type: 'color',
+    inputs: [
+      {
+        name: 'r',
+        type: 'float',
+        default: 0.299
+      },
+      {
+        name: 'g',
+        type: 'float',
+        default: 0.587
+      },
+      {
+        name: 'b',
+        type: 'float',
+        default: 0.114
+      }
+    ],
+    notes: 'Converts color to greyscale. Defaults are standard, but there are others.',
+    glsl: `vec4 gray(vec4 c, float r, float g, float b){
+      float gray = r * c.r + g * c.g + b * c.b;
+      vec3 grayscale = vec3(gray);
+      return vec4(grayscale, c.a);
+    }
+    `
+  },
   repeat: {
     type: 'coord',
     inputs: [
@@ -560,6 +662,168 @@ float _noise(vec3 v){
       return fract(st);
     }`
   },
+  tileX: {
+    type: 'coord',
+    inputs: [
+      {
+        name: 'repeatX',
+        type: 'float',
+        default: 2.0
+      },
+      {
+        name: 'offset',
+        type: 'float',
+        default: 0.0
+      }
+    ],
+    notes: 'Seamless tile, flipping textures as needed to line up sides.',
+    glsl: `vec2 tileX(vec2 _st, float repeatX, float offset){
+        vec2 st = _st * vec2(repeatX, 1.0);
+
+        st.x += offset;
+
+        //  Give each cell an index number
+        //  according to its position
+        float index = 0.0;
+        index += step(1., mod(st.x,2.0));
+
+        //      |      |
+        //  0   |  1   |  0
+        //      |      |
+
+        // Make each cell between 0.0 - 1.0
+        st = fract(st);
+
+        // Flip each cell according to the index
+        if (index == 0.0) {
+            st = st * vec2(-1.0, 1.0);
+        }
+
+        return st;
+    }`
+  },
+  tileY: {
+    type: 'coord',
+    inputs: [
+      {
+        name: 'repeatY',
+        type: 'float',
+        default: 2.0
+      },
+      {
+        name: 'offset',
+        type: 'float',
+        default: 0.0
+      }
+    ],
+    notes: 'Seamless tile, flipping textures as needed to line up sides.',
+    glsl: `vec2 tileY(vec2 _st, float repeatY, float offset){
+        vec2 st = _st * vec2(repeatY, 1.0);
+
+        st.y += offset;
+
+        //  Give each cell an index number
+        //  according to its position
+        float index = 0.0;
+        index += step(1., mod(st.y,2.0));
+
+        // Make each cell between 0.0 - 1.0
+        st = fract(st);
+
+        // Flip each cell according to the index
+        if (index == 1.0) {
+            st = st * vec2(1.0, -1.0);
+        }
+
+        return st;
+    }`
+  },
+  tile: {
+    type: 'coord',
+    inputs: [
+      {
+        name: 'repeatX',
+        type: 'float',
+        default: 1.0
+      },
+      {
+        name: 'repeatY',
+        type: 'float',
+        default: 1.0
+      },
+      {
+        name: 'offsetX',
+        type: 'float',
+        default: 0.0
+      },
+      {
+        name: 'offsetY',
+        type: 'float',
+        default: 0.0
+      }
+    ],
+    notes: 'Seamless tile, flipping textures as needed to line up sides.',
+    glsl: `vec2 tile(vec2 _st, float repeatX, float repeatY, float offsetX, float offsetY){
+        if (repeatX < 1.0) {
+          vec2 st = _st * vec2(repeatY+1.0, 1.0);
+          st.y += offsetY;
+          float index = 0.0;
+          index += step(1., mod(st.y,2.0));
+          st = fract(st);
+          if (index == 1.0) {
+              st = st * vec2(1.0, -1.0);
+          }
+          return st;
+        }
+        if (repeatY < 1.0) {
+          vec2 st = _st * vec2(repeatX+1.0, 1.0);
+          st.x += offsetX;
+          float index = 0.0;
+          index += step(1., mod(st.x,2.0));
+          st = fract(st);
+          if (index == 1.0) {
+              st = st * vec2(-1.0, 1.0);
+          }
+          return st;
+        }
+
+        vec2 st = _st * vec2(repeatX, repeatY);
+
+        //  Scale the coordinate system by 2x2
+        st *= 2.0;
+
+        st.x += offsetX;
+        st.y += offsetY;
+
+        //  Give each cell an index number
+        //  according to its position
+        float index = 0.0;
+        index += step(1., mod(st.x,2.0));
+        index += step(1., mod(st.y,2.0))*2.0;
+
+        //      |
+        //  2   |   3
+        //      |
+        //--------------
+        //      |
+        //  0   |   1
+        //      |
+
+        // Make each cell between 0.0 - 1.0
+        st = fract(st);
+
+        // Flip each cell according to the index
+        if (index == 0.0) {
+            st = st * vec2(1.0, -1.0);
+        } else if(index == 1.0) {
+            st = st * vec2(-1.0, -1.0);
+        } else if(index == 3.0) {
+            st = st * vec2(-1.0, 1.0);
+        }
+
+        return st;
+    }`
+  },
   kaleid: {
     type: 'coord',
     inputs: [
@@ -567,15 +831,24 @@ float _noise(vec3 v){
         name: 'nSides',
         type: 'float',
         default: 4.0
+      },
+      {
+        name: 'offsetX',
+        type: 'float',
+        default: 0.5
+      },
+      {
+        name: 'offsetY',
+        type: 'float',
+        default: 0.5
       }
     ],
-    glsl: `vec2 kaleid(vec2 st, float nSides){
-      st -= 0.5;
+    glsl: `vec2 kaleid(vec2 st, float nSides, float xPivot, float yPivot){
+      st -= vec2(xPivot, yPivot);
       float r = length(st);
       float a = atan(st.y, st.x);
-      float pi = 2.*3.1416;
-      a = mod(a,pi/nSides);
-      a = abs(a-pi/nSides/2.);
+      a = mod(a, 6.2831853/nSides);   // two pi / nSides
+      a = abs(a - 3.14159265/nSides); // pi / nSides
       return r*vec2(cos(a), sin(a));
     }`
   },
@@ -700,7 +973,7 @@ float _noise(vec3 v){
       }
     ],
     glsl: `vec4 add(vec4 c0, vec4 c1, float amount){
-            return (c0+c1)*amount + c0*(1.0-amount);
+            return (c0+c1)*amount*c1.a + c0*(1.0-amount*c1.a);
           }`
   },
   layer: {
@@ -730,7 +1003,7 @@ float _noise(vec3 v){
       }
     ],
     glsl: `vec4 blend(vec4 c0, vec4 c1, float amount){
-      return c0*(1.0-amount)+c1*amount;
+      return c0*(1.0-(amount*c1.a)) + c1*(amount*c1.a);
     }`
   },
   mult: {
@@ -747,7 +1020,7 @@ float _noise(vec3 v){
       }
     ],
     glsl: `vec4 mult(vec4 c0, vec4 c1, float amount){
-      return c0*(1.0-amount)+(c0*c1)*amount;
+      return c0*(1.0-(amount*c1.a)) + (c0*c1)*(amount*c1.a);
     }`
   },
 

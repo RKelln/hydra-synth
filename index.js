@@ -81,14 +81,12 @@ class HydraSynth {
     var self = this
     this.canvas.toBlob( (blob) => {
       //  var url = window.URL.createObjectURL(blob)
-
+        a.href = URL.createObjectURL(blob)
+        console.log(a.href)
+        a.click()
         if(self.imageCallback){
           self.imageCallback(blob)
           delete self.imageCallback
-        } else {
-          a.href = URL.createObjectURL(blob)
-          console.log(a.href)
-          a.click()
         }
     }, 'image/png')
     setTimeout(() => {
@@ -139,7 +137,7 @@ class HydraSynth {
 
     this.renderAll = this.regl({
       frag: `
-      precision highp float;
+      precision mediump float;
       varying vec2 uv;
       uniform sampler2D tex0;
       uniform sampler2D tex1;
@@ -167,7 +165,7 @@ class HydraSynth {
       }
       `,
       vert: `
-      precision highp float;
+      precision mediump float;
       attribute vec2 position;
       varying vec2 uv;
 
@@ -194,7 +192,7 @@ class HydraSynth {
 
     this.renderFbo = this.regl({
       frag: `
-      precision highp float;
+      precision mediump float;
       varying vec2 uv;
       uniform vec2 resolution;
       uniform sampler2D tex0;
@@ -204,7 +202,7 @@ class HydraSynth {
       }
       `,
       vert: `
-      precision highp float;
+      precision mediump float;
       attribute vec2 position;
       varying vec2 uv;
 
@@ -293,7 +291,7 @@ class HydraSynth {
     //   color: [0, 0, 0, 1]
     // })
     window.time = this.time
-    if(this.detectAudio === true) this.audio.tick()
+    if(this.detectAudio === true) this.audio.tick(this.time)
     for (let i = 0; i < this.s.length; i++) {
       this.s[i].tick(this.time)
     }
@@ -327,6 +325,15 @@ class HydraSynth {
     if(this.saveFrame === true) {
       this.canvasToImage()
       this.saveFrame = false
+    }
+  }
+
+  stop() {
+    this.regl.destroy()
+    if (this.detectAudio === true) {
+      this.detectAudio = false
+      this.audio.hide()
+      this.audio = null
     }
   }
 

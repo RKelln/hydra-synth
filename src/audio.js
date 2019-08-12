@@ -11,6 +11,7 @@ class Audio {
     isDrawing = false
   }) {
     this.vol = 0
+    this.sensitivty = 1
     this.scale = scale
     this.max = max
     this.cutoff = cutoff
@@ -19,11 +20,12 @@ class Audio {
 
     // beat detection from: https://github.com/therewasaguy/p5-music-viz/blob/gh-pages/demos/01d_beat_detect_amplitude/sketch.js
     this.beat = {
-      holdFrames: 20,
-      threshold: 40,
+      holdFrames: 15,
+      threshold: 3,
       _cutoff: 0, // adaptive based on sound state
       decay: 0.98,
-      _framesSinceBeat: 0 // keeps track of frames
+      _framesSinceBeat: 0 ,// keeps track of frames
+      last: null, // time of last beat
     }
 
     this.onBeat = () => {
@@ -73,34 +75,36 @@ class Audio {
       })
   }
 
-  detectBeat (level) {
-    //console.log(level,   this.beat._cutoff)
-    if (level > this.beat._cutoff && level > this.beat.threshold) {
+  detectBeat(time, level, threshold) {
+    //console.log(level, this.beat)
+
+    if (level > this.beat._cutoff && level > threshold) {
       this.onBeat()
-      this.beat._cutoff = level *1.2
+      this.beat.last = time
+      this.beat._cutoff = level * 1.2
       this.beat._framesSinceBeat = 0
     } else {
       if (this.beat._framesSinceBeat <= this.beat.holdFrames){
-        this.beat._framesSinceBeat ++;
+        this.beat._framesSinceBeat++;
       } else {
         this.beat._cutoff *= this.beat.decay
-        this.beat._cutoff = Math.max(  this.beat._cutoff, this.beat.threshold);
+        this.beat._cutoff = Math.min(  this.beat._cutoff, threshold);
       }
     }
   }
 
-  tick() {
+  tick(time) {
    if(this.meyda){
      var features = this.meyda.get()
      if(features && features !== null){
-       this.vol = features.loudness.total
-       this.detectBeat(this.vol)
+       this.vol = this.sensitivty * Math.max(0, features.loudness.total - (this.cutoff * this.bins.length))
+       this.detectBeat(time, this.vol, this.beat.threshold * this.bins.length)
        // reduce loudness array to number of bins
        const reducer = (accumulator, currentValue) => accumulator + currentValue;
        let spacing = Math.floor(features.loudness.specific.length/this.bins.length)
        this.prevBins = this.bins.slice(0)
        this.bins = this.bins.map((bin, index) => {
-         return features.loudness.specific.slice(index * spacing, (index + 1)*spacing).reduce(reducer)
+         return this.sensitivty * features.loudness.specific.slice(index * spacing, (index + 1)*spacing).reduce(reducer)
        }).map((bin, index) => {
          // map to specified range
 
@@ -115,28 +119,56 @@ class Audio {
        //
        // var yMax = this.canvas.height - scale*(this.settings[index].scale + this.settings[index].cutoff)
        this.fft = this.bins.map((bin, index) => (
-        // Math.max(0, (bin - this.cutoff) / (this.max - this.cutoff))
+         // Math.max(0, (bin - this.cutoff) / (this.max - this.cutoff))
+
+         // scale is the amount above the cutoff
+
          Math.max(0, (bin - this.settings[index].cutoff)/this.settings[index].scale)
        ))
-       if(this.isDrawing) this.draw()
+       if(this.isDrawing) this.draw(time)
      }
    }
   }
 
+  _handleArrayParam(arr, param) {
+    // if not enough array values for each bin then just copy the last
+    let i = 0
+    for (let el of this.settings) {
+      el[param] = arr[i]
+      if (i < arr.length - 1) i++
+    }
+  }
+
+  setSensitivity(sensitivty) {
+    this.sensitivty = sensitivty
+  }
+
   setCutoff (cutoff) {
-    this.cutoff = cutoff
-    this.settings = this.settings.map((el) => {
-      el.cutoff = cutoff
-      return el
-    })
+    if (Array.isArray(cutoff)) {
+      this._handleArrayParam(cutoff, 'cutoff')
+      const sum = (accumulator, el) => accumulator + el.cutoff;
+      this.cutoff = this.settings.reduce(sum)
+    } else {
+      this.cutoff = cutoff
+      this.settings = this.settings.map((el) => {
+        el.cutoff = cutoff
+        return el
+      })
+    }
   }
 
   setSmooth (smooth) {
-    this.smooth = smooth
-    this.settings = this.settings.map((el) => {
-      el.smooth = smooth
-      return el
-    })
+    if (Array.isArray(smooth)) {
+      this._handleArrayParam(smooth, 'smooth')
+      const sum = (accumulator, el) => accumulator + el.smooth;
+      this.smooth = this.settings.reduce(sum)
+    } else {
+      this.smooth = smooth
+      this.settings = this.settings.map((el) => {
+        el.smooth = smooth
+        return el
+      })
+    }
   }
 
   setBins (numBins) {
@@ -156,17 +188,29 @@ class Audio {
   }
 
   setScale(scale){
-    this.scale = scale
-    this.settings = this.settings.map((el) => {
-      el.scale = scale
-      return el
-    })
+    if (Array.isArray(scale)) {
+      // TODO: check vs each cutoff
+      this._handleArrayParam(scale, 'scale')
+      const sum = (accumulator, el) => accumulator + el.scale;
+      this.scale = this.settings.reduce(sum)
+    } else {
+      if (scale < this.cutoff) {
+        console.log("Cannot set scale less than cutoff")
+        return
+      }
+      this.scale = scale
+      this.settings = this.settings.map((el) => {
+        el.scale = scale
+        return el
+      })
+    }
   }
 
   setMax(max) {
     this.max = max
     console.log('set max is deprecated')
   }
+
   hide() {
     this.isDrawing = false
     this.canvas.style.display = 'none'
@@ -175,32 +219,53 @@ class Audio {
   show() {
     this.isDrawing = true
     this.canvas.style.display = 'block'
-
   }
 
-  draw () {
+  draw (time) {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
     var spacing = this.canvas.width / this.bins.length
     var scale = this.canvas.height / (this.max * 2)
-  //  console.log(this.bins)
+
+    // beats are green
+    if (this.beat.last && time - this.beat.last < 0.12) {
+      this.ctx.fillStyle="#88FF88"
+    } else {
+      this.ctx.fillStyle="#DFFFFF"
+    }
+
+    //  console.log(this.bins)
     this.bins.forEach((bin, index) => {
 
-      var height = bin * scale
+      var height = this.canvas.height - bin * scale
+      var y = this.canvas.height - scale*this.settings[index].cutoff
+      var yMax = this.canvas.height - scale*(this.settings[index].scale + this.settings[index].cutoff)
 
-     this.ctx.fillRect(index * spacing, this.canvas.height - height, spacing, height)
+      if (height < yMax) {
+        this.ctx.fillStyle="#DD0000"
+      }
+      else if (height < y) {
+        this.ctx.fillStyle="#FF9900"
+      } else {
+        this.ctx.fillStyle="#DFFFFF"
+      }
 
-  //   console.log(this.settings[index])
-     var y = this.canvas.height - scale*this.settings[index].cutoff
-     this.ctx.beginPath()
-     this.ctx.moveTo(index*spacing, y)
-     this.ctx.lineTo((index+1)*spacing, y)
-     this.ctx.stroke()
+      this.ctx.fillRect(index * spacing, height, spacing, height)
 
-     var yMax = this.canvas.height - scale*(this.settings[index].scale + this.settings[index].cutoff)
-     this.ctx.beginPath()
-     this.ctx.moveTo(index*spacing, yMax)
-     this.ctx.lineTo((index+1)*spacing, yMax)
-     this.ctx.stroke()
+      //   console.log(this.settings[index])
+
+      // cutoff line
+      this.ctx.beginPath()
+      this.ctx.moveTo(index*spacing, y)
+      this.ctx.lineTo((index+1)*spacing, y)
+      this.ctx.stroke()
+
+      // scale line
+      this.ctx.beginPath()
+      this.ctx.moveTo(index*spacing, yMax)
+      this.ctx.lineTo((index+1)*spacing, yMax)
+      this.ctx.stroke()
+
+      //console.log("bins", index, y, yMax)
     })
 
 
