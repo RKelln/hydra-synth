@@ -1,3 +1,42 @@
+## This is a fork
+
+This is a fork of the original, wonderful project. See [Coding Chaos Concert](https://github.com/RKelln/CodingChaosConcert) for more details.
+
+
+### Hydra-synth fork modifications:
+
+Currently all changes only reside on the `coding_chaos_concert_2019` branch.
+
+* Work added on top of SHA [da8d6d038ff6875a21251998345ae62fcd5a6992](https://github.com/ojack/hydra-synth/tree/da8d6d038ff6875a21251998345ae62fcd5a6992)
+
+* Add `stop()` method that helps improve cleanup
+* Improvements to `createFades()` to allow for better stopping of fades
+
+* Changes to `audio.js`:
+  * Allow for array parameters to many functions
+  * Change how volume is calculated and used in detect beat
+  * Allows cutoff, smooth, scale to be set per bin
+  * Add time parameter to `tick()` and `draw()`
+  * Indicate clipped audio graphically in audio display
+
+* Add a number of helpers to control rate of change smoothly:
+  * `vel`: takes a thruster function that applies thrust to generate a velocity
+  * `pos`: takes a velocity and finish function and outputs a position
+  * `repeat`: finish function that sets the position to the start position
+  * `sweep`: finish function that reverses direction, without affecting velocity
+  * `bounce`: finish function that reverses direction and inverts velocity and multiplies by bounciness
+
+* Add or modify GSGL:
+  * Use alpha channel in more GSGL calculations 
+    * Still very experimental and not completely functional
+* Add `tile`, `tileX` and `tileY`: seamless tile, flipping textures as needed to line up sides
+* Add `gray`: converts color to grayscale
+* Add `removeColor`: turns a pixel to 0 alpha (based on how close the pixel color is to target color)
+* Add `alpha`: sets the alpha channel
+* Add `channel`: multiplies each channel by the parameter passed in, good for isolating channels
+
+
+
 ### Hydra-Synth
 
 Video synth engine for [hydra](https://github.com/ojack/hydra).
